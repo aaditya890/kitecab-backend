@@ -25,7 +25,7 @@ export default route({ methods: ['POST'], cors: true }, async (req, res) => {
   if (!booking) throw new HttpError(404, 'Booking not found.');
 
   const payments = must(
-    await db().from('payments').select('*').eq('booking_id', bookingId).order('created_at', { ascending: false }),
+    await db().from('booking_payments').select('*').eq('booking_id', bookingId).order('created_at', { ascending: false }),
     'load payments',
   );
   if (payments.some((p) => p.status === 'PAID') && action === 'new-payment-link') {
@@ -47,14 +47,14 @@ export default route({ methods: ['POST'], cors: true }, async (req, res) => {
   // new-payment-link
   for (const p of payments.filter((p) => p.status === 'PENDING')) {
     await cancelPaymentLink(p.razorpay_payment_link_id);
-    await db().from('payments').update({ status: 'CANCELLED' }).eq('id', p.id);
+    await db().from('booking_payments').update({ status: 'CANCELLED' }).eq('id', p.id);
   }
   const amount = booking.advance_amount ?? advanceFor(booking.fare, settings.advance_percent);
   const attempt = Math.max(0, ...payments.map((p) => Number(p.attempt ?? 1))) + 1;
   const link = await createPaymentLink({
     bookingId, amount, customerName: booking.customer_name, mobile: booking.mobile, email: booking.email, attempt,
   });
-  must(await db().from('payments').insert({
+  must(await db().from('booking_payments').insert({
     booking_id: bookingId,
     customer_name: booking.customer_name,
     mobile: booking.mobile,

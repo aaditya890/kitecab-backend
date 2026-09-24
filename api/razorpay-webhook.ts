@@ -21,7 +21,7 @@ async function handlePaid(body: RazorpayEvent, raw: unknown) {
   if (!link) return;
 
   // `status <> 'PAID'` makes this idempotent: Razorpay retries only update once.
-  const { data: updated, error } = await db().from('payments')
+  const { data: updated, error } = await db().from('booking_payments')
     .update({
       status: 'PAID',
       paid_at: new Date().toISOString(),
@@ -36,7 +36,7 @@ async function handlePaid(body: RazorpayEvent, raw: unknown) {
   const paid = updated?.[0];
   if (!paid) return; // unknown link or already processed
 
-  // Bookings made on the legacy site may not exist in `bookings` yet — that's fine.
+  // Legacy links are copied into booking_payments by 003 (re-run at launch).
   await db().from('bookings').update({ status: 'confirmed' })
     .eq('id', paid.booking_id).eq('status', 'new');
 
@@ -56,7 +56,7 @@ async function handlePaid(body: RazorpayEvent, raw: unknown) {
 async function handleClosed(body: RazorpayEvent, status: 'EXPIRED' | 'CANCELLED') {
   const link = body.payload.payment_link?.entity;
   if (!link) return;
-  await db().from('payments').update({ status }).eq('razorpay_payment_link_id', link.id).eq('status', 'PENDING');
+  await db().from('booking_payments').update({ status }).eq('razorpay_payment_link_id', link.id).eq('status', 'PENDING');
 }
 
 const handler = route({ methods: ['POST'] }, async (req, res) => {

@@ -6,16 +6,15 @@ begin;
 --   * all writes from the site -> go through the backend (service key)
 --   * admin                    -> full access via Supabase Auth login
 --   * driver / customer        -> only their own rows (future logins)
--- The legacy `kitecab` and `payments` tables are locked in 004_cutover.sql,
--- NOT here, so the live site keeps working until the switch.
+-- The live `kitecab` and `payments` tables are NOT touched here.
 -- =====================================================================
 
-create or replace function public.current_role_is(r public.user_role)
+create function public.current_role_is(r public.user_role)
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = r)
 $$;
 
-create or replace function public.is_admin()
+create function public.is_admin()
 returns boolean language sql stable as $$ select public.current_role_is('admin') $$;
 
 -- enable RLS everywhere (no policy = no access)
@@ -32,6 +31,7 @@ alter table public.driver_documents       enable row level security;
 alter table public.enquiries              enable row level security;
 alter table public.bookings               enable row level security;
 alter table public.booking_status_history enable row level security;
+alter table public.booking_payments       enable row level security;
 
 -- ---------- public catalogue -----------------------------------------
 create policy "public read active locations" on public.locations
@@ -51,7 +51,7 @@ declare t text;
 begin
   foreach t in array array['settings','locations','routes','rental_packages','round_trip_rates',
                            'profiles','customers','drivers','vehicles','driver_documents',
-                           'enquiries','bookings','booking_status_history']
+                           'enquiries','bookings','booking_status_history','booking_payments']
   loop
     execute format('create policy "admin all %1$s" on public.%1$I
                     for all using (public.is_admin()) with check (public.is_admin())', t);
@@ -81,7 +81,8 @@ create policy "driver reads own documents" on public.driver_documents
 revoke all on public.settings, public.locations, public.routes, public.rental_packages,
               public.round_trip_rates, public.route_fares, public.profiles, public.customers,
               public.drivers, public.vehicles, public.driver_documents, public.enquiries,
-              public.bookings, public.booking_status_history
+              public.bookings, public.booking_status_history,
+              public.booking_payments
   from anon, authenticated;
 grant select on public.settings, public.locations, public.routes, public.rental_packages,
                 public.round_trip_rates, public.route_fares to anon, authenticated;
@@ -89,7 +90,7 @@ grant insert, update, delete on public.settings, public.locations, public.routes
                 public.rental_packages, public.round_trip_rates to authenticated;
 grant select, insert, update, delete on public.profiles, public.customers, public.drivers,
                 public.vehicles, public.driver_documents, public.enquiries, public.bookings,
-                public.booking_status_history to authenticated;
+                public.booking_status_history, public.booking_payments to authenticated;
 
 -- ---------- admin bootstrap -------------------------------------------
 -- 1. Supabase dashboard -> Authentication -> Users -> Add user

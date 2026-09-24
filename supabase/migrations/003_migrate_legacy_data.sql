@@ -3,7 +3,7 @@
 --
 -- * Re-runnable until launch: it EMPTIES the new tables first, then
 --   rebuilds them from the legacy rows. Run it one final time at cutover.
--- * Never modifies the legacy `kitecab` or `payments` tables.
+-- * Only READS the live `kitecab` and `payments` tables — never changes them.
 -- * Uses your data and prices exactly; only cleans obvious junk:
 --     - trims spaces, 'Arrah(BR)' -> 'Arrah (BR)'
 --     - drops empty rows and testingPickup/testingDrop
@@ -84,7 +84,7 @@ create or replace function pg_temp.legacy(k text) returns setof jsonb language s
 $$;
 
 -- ---------- reset new tables -----------------------------------------
-truncate public.booking_status_history, public.bookings, public.customers,
+truncate public.booking_payments, public.booking_status_history, public.bookings, public.customers,
          public.enquiries, public.routes, public.rental_packages, public.locations
   restart identity cascade;
 
@@ -240,7 +240,37 @@ select case when lower(e->>'dropLocationOrPackages') ~ '\d+\s*hour' then 'local-
        pg_temp.to_int(e->>'id')
 from pg_temp.legacy('enquiry') e;
 
+-- ---------- payments (copied from the live `payments` table) ---------
+insert into public.booking_payments (booking_id, customer_name, mobile, booking_amount, advance_amount,
+       payment_type, status, payment_link, razorpay_payment_link_id, razorpay_payment_id, reference_id,
+       paid_at, webhook_response, legacy_id, created_at, updated_at)
+select p.booking_id,
+       coalesce(nullif(trim(p.customer_name), ''), '-'),
+       coalesce(trim(p.mobile), ''),
+       round(coalesce(p.booking_amount, 0))::int,
+       round(coalesce(p.advance_amount, 0))::int,
+       coalesce(p.payment_type, 'ADVANCE'),
+       case when p.status in ('PENDING', 'PAID', 'EXPIRED', 'CANCELLED', 'FAILED') then p.status else 'PENDING' end,
+       p.payment_link,
+       p.razorpay_payment_link_id,
+       nullif(p.razorpay_payment_id, ''),
+       p.reference_id,
+       p.paid_at at time zone 'UTC',          -- live column is 'timestamp without time zone' (UTC)
+       p.webhook_response,
+       p.id,
+       p.created_at,
+       coalesce(p.updated_at, p.created_at)
+from public.payments p
+where p.booking_id is not null and p.razorpay_payment_link_id is not null
+order by p.id
+on conflict (razorpay_payment_link_id) do nothing;
+
 alter table public.bookings enable trigger bookings_status_log;
+
+-- remove the temporary helpers
+drop function pg_temp.to_int(text), pg_temp.place(text), pg_temp.car(text), pg_temp.btype(text),
+              pg_temp.pickup_date(text), pg_temp.mobile(text), pg_temp.enquiry_ts(text, text),
+              pg_temp.legacy(text);
 
 commit;
 
@@ -251,4 +281,6 @@ union all select 'rental_packages', count(*) from public.rental_packages
 union all select 'bookings', count(*) from public.bookings
 union all select 'customers', count(*) from public.customers
 union all select 'enquiries', count(*) from public.enquiries
-union all select 'enquiries with invalid mobile (NULL)', count(*) from public.enquiries where mobile is null;
+union all select 'enquiries with invalid mobile (NULL)', count(*) from public.enquiries where mobile is null
+union all select 'payments', count(*) from public.booking_payments
+union all select 'payments PAID', count(*) from public.booking_payments where status = 'PAID';

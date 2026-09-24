@@ -30,7 +30,7 @@ export interface BookingForMessage {
   drop_location: string | null;
   rental_package: string | null;
   pickup_address: string;
-  pickup_date: string;      // YYYY-MM-DD
+  pickup_date: string;
   pickup_time: string;
   customer_name: string;
   mobile: string;

@@ -1,8 +1,8 @@
 -- =====================================================================
 -- KiteCab v2 — core schema
 -- Run in Supabase SQL editor (or `supabase db push`).
--- Creates NEW tables alongside the legacy `kitecab` table, so the live
--- site keeps working until cutover. Safe to run once on a fresh project.
+-- Creates NEW objects only. The live tables `kitecab` and `payments` are
+-- never altered (no columns, indexes, grants or policies are added to them).
 -- =====================================================================
 begin;
 
@@ -14,12 +14,12 @@ create type public.user_role      as enum ('admin', 'driver', 'customer');
 create type public.driver_status  as enum ('pending', 'approved', 'suspended');
 
 -- ---------- helpers --------------------------------------------------
-create or replace function public.slugify(txt text)
+create function public.slugify(txt text)
 returns text language sql immutable as $$
   select trim(both '-' from regexp_replace(lower(coalesce(txt, '')), '[^a-z0-9]+', '-', 'g'))
 $$;
 
-create or replace function public.touch_updated_at()
+create function public.touch_updated_at()
 returns trigger language plpgsql as $$
 begin
   new.updated_at := now();
@@ -244,7 +244,7 @@ create table public.booking_status_history (
   created_at  timestamptz not null default now()
 );
 
-create or replace function public.log_booking_status()
+create function public.log_booking_status()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   if tg_op = 'INSERT' or new.status is distinct from old.status then
@@ -258,22 +258,38 @@ create trigger bookings_status_log
   after insert or update of status on public.bookings
   for each row execute function public.log_booking_status();
 
--- ---------- payments (existing table: extend, don't recreate) --------
--- The live site already writes here; only additive changes now.
-alter table public.payments
-  add column if not exists amount_paid int,
-  add column if not exists failure_reason text;
-create unique index if not exists payments_link_id_uidx on public.payments (razorpay_payment_link_id);
-create unique index if not exists payments_payment_id_uidx on public.payments (razorpay_payment_id)
-  where razorpay_payment_id is not null;
-create index if not exists payments_booking_idx on public.payments (booking_id);
+-- ---------- payments (NEW table; the live `payments` table is only read) --
+create table public.booking_payments (
+  id                       bigint generated always as identity primary key,
+  booking_id               bigint not null,
+  customer_name            text not null,
+  mobile                   text not null,
+  booking_amount           int not null,
+  advance_amount           int not null,
+  payment_type             text not null default 'ADVANCE',
+  status                   text not null default 'PENDING'
+                             check (status in ('PENDING', 'PAID', 'EXPIRED', 'CANCELLED', 'FAILED')),
+  payment_link             text,
+  razorpay_payment_link_id text not null unique,
+  razorpay_payment_id      text unique,
+  reference_id             text,
+  attempt                  int not null default 1,   -- admin "new link" uses attempt + 1
+  amount_paid              int,
+  paid_at                  timestamptz,
+  webhook_response         jsonb,
+  legacy_id                bigint,                   -- id in the old `payments` table
+  created_at               timestamptz not null default now(),
+  updated_at               timestamptz not null default now()
+);
+create index booking_payments_booking_idx on public.booking_payments (booking_id);
+create index booking_payments_created_idx on public.booking_payments (created_at desc);
 
 -- ---------- updated_at triggers --------------------------------------
 do $$
 declare t text;
 begin
   foreach t in array array['locations','routes','rental_packages','round_trip_rates',
-                           'customers','drivers','vehicles','bookings','settings']
+                           'customers','drivers','vehicles','bookings','settings','booking_payments']
   loop
     execute format('create trigger %I_touch before update on public.%I
                     for each row execute function public.touch_updated_at()', t, t);

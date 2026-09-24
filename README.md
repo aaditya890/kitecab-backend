@@ -2,16 +2,18 @@
 
 Vercel API (booking, enquiry, Razorpay, MSG91 WhatsApp) + Supabase database.
 
-## Database setup (Supabase SQL editor, run in order)
+## Database setup (Supabase SQL editor)
 
-| File | What it does | When |
-|---|---|---|
-| `supabase/migrations/001_schema.sql` | New tables, enums, settings, round-trip rates, views | Once |
-| `supabase/migrations/002_rls.sql` | Security rules; follow the admin bootstrap note at the bottom | Once |
-| `supabase/migrations/003_migrate_legacy_data.sql` | Copies legacy `kitecab` JSON into the new tables (cleans junk, keeps booking IDs and prices) | Any time before launch; **again at cutover** |
-| `supabase/migrations/004_api_support.sql` | Columns used by the API (spam limits, payment link attempts) | Once |
+The live site's tables `kitecab` and `payments` are **only read, never changed**.
 
-Nothing here changes the legacy `kitecab` / `payments` data, so the live site keeps working.
+| File | Use |
+|---|---|
+| `supabase/check_live_tables.sql` | Read-only fingerprint of the live tables. Run **before and after** setup — the `structure` rows must match. |
+| `supabase/setup_v2.sql` | **One file, one Run.** Creates all new tables and copies the data. Re-run on launch day to pick up the latest bookings. |
+| `supabase/rollback_v2.sql` | Removes everything `setup_v2.sql` created. |
+| `supabase/migrations/001..004` | Source files that `setup_v2.sql` is generated from. |
+
+After setup, create the admin login (see the end of `migrations/002_rls.sql`).
 
 ## Changing business rules later — no code change needed
 

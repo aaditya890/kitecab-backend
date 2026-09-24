@@ -117,7 +117,7 @@ export async function createBooking(input: BookingInput, settings: Settings, ipH
         bookingId: booking.id, amount: advanceAmount, customerName: c.fullName, mobile: c.mobile, email: c.email,
       });
       paymentLink = link.short_url;
-      const saved = await db().from('payments').insert({
+      const saved = await db().from('booking_payments').insert({
         booking_id: booking.id,
         customer_name: c.fullName,
         mobile: c.mobile,
