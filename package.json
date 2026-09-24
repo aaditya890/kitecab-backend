@@ -1,0 +1,25 @@
+{
+  "name": "kitecab-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KiteCab API on Vercel: enquiries, bookings, Razorpay, MSG91 WhatsApp",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
+    "@vercel/functions": "^3.9.9",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@vercel/node": "^14.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
