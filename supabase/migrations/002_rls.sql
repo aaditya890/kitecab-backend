@@ -1,4 +1,5 @@
 -- =====================================================================
+begin;
 -- KiteCab v2 — Row Level Security
 -- Rule of thumb:
 --   * website visitors (anon)  -> read active fares + public settings only
@@ -98,3 +99,5 @@ grant select, insert, update, delete on public.profiles, public.customers, publi
 --    select id, 'admin', 'KiteCab Admin' from auth.users
 --    where email = 'kitecabtaxiservice@gmail.com'
 --    on conflict (id) do update set role = 'admin';
+
+commit;

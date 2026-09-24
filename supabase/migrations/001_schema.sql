@@ -4,6 +4,7 @@
 -- Creates NEW tables alongside the legacy `kitecab` table, so the live
 -- site keeps working until cutover. Safe to run once on a fresh project.
 -- =====================================================================
+begin;
 
 -- ---------- enums ----------------------------------------------------
 create type public.booking_type   as enum ('oneway', 'round-trip', 'local-rental');
@@ -290,3 +291,5 @@ from public.routes r
 join public.locations f on f.id = r.from_location_id and f.is_active
 join public.locations t on t.id = r.to_location_id   and t.is_active
 where r.is_active;
+
+commit;
