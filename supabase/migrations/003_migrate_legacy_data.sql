@@ -242,14 +242,13 @@ from pg_temp.legacy('enquiry') e;
 
 alter table public.bookings enable trigger bookings_status_log;
 
+commit;
+
 -- ---------- report ---------------------------------------------------
 select 'locations' as tbl, count(*) from public.locations
 union all select 'routes', count(*) from public.routes
 union all select 'rental_packages', count(*) from public.rental_packages
 union all select 'bookings', count(*) from public.bookings
-union all select 'bookings without pickup date (defaulted)', count(*) from booking_rows where pickup_date is null
 union all select 'customers', count(*) from public.customers
 union all select 'enquiries', count(*) from public.enquiries
 union all select 'enquiries with invalid mobile (NULL)', count(*) from public.enquiries where mobile is null;
-
-commit;
