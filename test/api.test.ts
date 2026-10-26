@@ -8,6 +8,7 @@ import { verifyWebhookSignature } from '../lib/razorpay';
 import { bookingInput, enquiryInput, mobile } from '../lib/validate';
 import {
   adminAdvancePaid, adminBooking, adminEnquiry, customerAdvancePaid, customerBooking, msg91Payload,
+  redirectForTesting,
 } from '../lib/whatsapp';
 
 const settings: Settings = {
@@ -134,4 +135,12 @@ test('IST formatting', () => {
   assert.equal(istDate(d), '25/09/2026');
   assert.equal(istTime(d), '01:30 am');
   assert.equal(displayDate('2026-09-24', true), '24 Sep 2026');
+});
+
+// ---------- test mode ----------
+test('test mode sends every message to the test number only', () => {
+  const msg = adminBooking(settings, booking);
+  assert.deepEqual(redirectForTesting(msg, '919999999999').to, ['919999999999']);
+  assert.equal(redirectForTesting(msg, undefined), msg);
+  assert.deepEqual(redirectForTesting(msg, '919999999999').components, msg.components);
 });

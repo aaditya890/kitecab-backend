@@ -118,8 +118,15 @@ export function msg91Payload(settings: Settings, msg: TemplateMessage) {
   };
 }
 
+/** Test mode: send every message to one number (see WHATSAPP_TEST_NUMBER). */
+export function redirectForTesting(msg: TemplateMessage, testNumber: string | undefined): TemplateMessage {
+  return testNumber ? { ...msg, to: [testNumber] } : msg;
+}
+
 /** Sends one template. Never throws — a failed WhatsApp must not fail a booking. */
-export async function sendWhatsApp(settings: Settings, msg: TemplateMessage): Promise<boolean> {
+export async function sendWhatsApp(settings: Settings, original: TemplateMessage): Promise<boolean> {
+  const msg = redirectForTesting(original, env.whatsappTestNumber);
+  if (msg !== original) console.info(`WhatsApp test mode: ${msg.template} -> ${msg.to[0]} (was ${original.to.join(', ')})`);
   try {
     const res = await fetch('https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/', {
       method: 'POST',
