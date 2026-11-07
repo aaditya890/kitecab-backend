@@ -2,18 +2,24 @@
 
 Vercel API (booking, enquiry, Razorpay, MSG91 WhatsApp) + Supabase database.
 
-## Database setup (Supabase SQL editor)
+## Database setup (NEW development Supabase project)
 
-The live site's tables `kitecab` and `payments` are **only read, never changed**.
+The live site keeps its own Supabase project; this one is separate, so nothing here can affect it.
+
+1. Supabase → New project (e.g. `kitecab-v2-dev`, region Mumbai).
+2. SQL Editor → run `supabase/dev/000_legacy_tables.sql` (empty copies of the live `kitecab` and `payments` tables).
+3. Table Editor → `kitecab` → Insert → Import data from CSV → `kitecab_rows.csv`; same for `payments` → `payments_rows.csv`.
+4. SQL Editor → run `supabase/setup_v2.sql` → the result shows the row counts.
+5. Authentication → Users → Add user (admin email + password, auto-confirm), then run the admin bootstrap at the end of `migrations/002_rls.sql`.
 
 | File | Use |
 |---|---|
-| `supabase/check_live_tables.sql` | Read-only fingerprint of the live tables. Run **before and after** setup — the `structure` rows must match. |
-| `supabase/setup_v2.sql` | **One file, one Run.** Creates all new tables and copies the data. Re-run on launch day to pick up the latest bookings. |
-| `supabase/rollback_v2.sql` | Removes everything `setup_v2.sql` created. |
-| `supabase/migrations/001..004` | Source files that `setup_v2.sql` is generated from. |
+| `supabase/migrations/001..006` | Source of truth. `python supabase/build-setup.py` regenerates `setup_v2.sql`. |
+| `supabase/setup_v2.sql` | Everything in one Run (tables, security, data copy, customer login, coupons, admin views). |
+| `supabase/rollback_v2.sql` | Removes everything setup_v2.sql created. |
+| `supabase/check_live_tables.sql` | Read-only fingerprint of `kitecab`/`payments` (for the live project, if ever needed). |
 
-After setup, create the admin login (see the end of `migrations/002_rls.sql`).
+To refresh data from a newer live export: re-import the CSVs into `kitecab`/`payments`, then run `migrations/003_migrate_legacy_data.sql` again.
 
 ## Changing business rules later — no code change needed
 
