@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "vercel dev",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "api": "tsx scripts/local-api.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
