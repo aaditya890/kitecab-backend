@@ -2,17 +2,18 @@
 //   { bookingId, action: 'customer-whatsapp' }  re-send booking message with the current pay link
 //   { bookingId, action: 'admin-whatsapp' }     re-send the admin booking alert
 //   { bookingId, action: 'new-payment-link' }   cancel old unpaid link, create a new one, WhatsApp it
+//   { bookingId, action: 'driver-whatsapp' }    send driver + car details to the customer
 import { z } from 'zod';
 import { requireAdmin } from '../../lib/admin-auth';
 import { db, getSettings, must } from '../../lib/db';
 import { HttpError, route } from '../../lib/http';
 import { advanceFor } from '../../lib/pricing';
 import { cancelPaymentLink, createPaymentLink } from '../../lib/razorpay';
-import { adminBooking, customerBooking, sendWhatsApp, type BookingForMessage } from '../../lib/whatsapp';
+import { adminBooking, customerBooking, driverAssigned, sendWhatsApp, type BookingForMessage } from '../../lib/whatsapp';
 
 const input = z.object({
   bookingId: z.number().int().positive(),
-  action: z.enum(['customer-whatsapp', 'admin-whatsapp', 'new-payment-link']),
+  action: z.enum(['customer-whatsapp', 'admin-whatsapp', 'new-payment-link', 'driver-whatsapp']),
 });
 
 export default route({ methods: ['POST'], cors: true }, async (req, res) => {
@@ -30,6 +31,23 @@ export default route({ methods: ['POST'], cors: true }, async (req, res) => {
   );
   if (payments.some((p) => p.status === 'PAID') && action === 'new-payment-link') {
     throw new HttpError(409, 'Advance is already paid for this booking.');
+  }
+
+  if (action === 'driver-whatsapp') {
+    const b = booking as BookingForMessage & { driver_id: number | null; vehicle_id: number | null };
+    if (!b.driver_id) throw new HttpError(409, 'Assign a driver first.');
+    const [d, v] = await Promise.all([
+      db().from('drivers').select('full_name, mobile').eq('id', b.driver_id).single(),
+      b.vehicle_id ? db().from('vehicles').select('model, car_type, registration_no').eq('id', b.vehicle_id).single() : Promise.resolve({ data: null }),
+    ]);
+    if (!d.data) throw new HttpError(404, 'Driver not found.');
+    const sent = await sendWhatsApp(settings, driverAssigned(b, {
+      driverName: d.data.full_name,
+      driverMobile: d.data.mobile,
+      carModel: v.data?.model || v.data?.car_type || null,
+      carNumber: v.data?.registration_no ?? null,
+    }));
+    return res.json({ ok: sent });
   }
 
   if (action === 'admin-whatsapp') {

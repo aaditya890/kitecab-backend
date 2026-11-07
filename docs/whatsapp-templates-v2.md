@@ -122,7 +122,8 @@ Please be ready at the pickup point on time. Have a safe and comfortable trip wi
 
 ---
 
-## After approval
+## Code
 
-Send me a screenshot of the approved list. The code then switches to these names in one file
-(`lib/whatsapp.ts`); admin numbers stay in Admin → Settings, so each number can be added or removed there.
+`lib/whatsapp.ts` sends these kc_* templates (switched on 7 Nov 2026, before Meta approval
+finished — messages start arriving as soon as each template is approved). Admin numbers come
+from Admin → Settings. `kc_driver_assigned` is sent from the booking page ("Send driver details").

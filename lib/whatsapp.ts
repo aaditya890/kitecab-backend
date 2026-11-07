@@ -1,5 +1,5 @@
-// MSG91 WhatsApp templates. Names, namespace and body_N order must match the
-// approved templates in MSG91 exactly — change values here, never the shape.
+// MSG91 WhatsApp templates (kc_* set, see docs/whatsapp-templates-v2.md).
+// Names, namespace and body_N order must match the templates in MSG91 exactly.
 import { env } from './env';
 import type { Settings } from './db';
 import { displayDate, istDate, istTime } from './format';
@@ -37,64 +37,109 @@ export interface BookingForMessage {
   email: string | null;
   passengers: number;
   fare: number;
+  advance_amount?: number | null;
 }
 
-// ---------- the 6 approved templates ----------------------------------
+const TYPE_LABEL: Record<string, string> = { oneway: 'One way', 'round-trip': 'Round trip', 'local-rental': 'Local rental' };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** 'One way, Sedan' */
+export const tripAndCar = (b: BookingForMessage) => `${TYPE_LABEL[b.booking_type] ?? b.booking_type}, ${b.car_type}`;
+
+/** 'Raipur to Bilaspur', or for a rental 'Raipur · 8hour 80km'. */
+export const routeText = (b: BookingForMessage) =>
+  b.booking_type === 'local-rental' || !b.drop_location
+    ? `${b.pickup_location} · ${b.rental_package ?? 'local rental'}`
+    : `${b.pickup_location} to ${b.drop_location}`;
+
+/** '25 Oct 2026, 6:30 PM' */
+export const pickupText = (b: { pickup_date: string; pickup_time: string }) => `${displayDate(b.pickup_date, true)}, ${b.pickup_time}`;
+
+/** '24 Oct, 4:51 PM' in India time. */
+export function enquiryTime(at = new Date()): string {
+  const d = new Date(at.getTime() + 330 * 60_000);
+  const h = d.getUTCHours() % 12 || 12;
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, ${h}:${String(d.getUTCMinutes()).padStart(2, '0')} ${d.getUTCHours() < 12 ? 'AM' : 'PM'}`;
+}
+
+const money = (n: number | null | undefined) => Number(n ?? 0).toLocaleString('en-IN');
+
+// ---------- the 6 kc_* templates ----------------------------------------
+
+/** kc_enquiry_admin: service, pickup, drop/package, mobile, time */
 export function adminEnquiry(
   settings: Settings,
-  e: { pickup: string; dropOrPackage: string | null; mobile: string; at?: Date },
+  e: { serviceType?: string | null; pickup: string; dropOrPackage: string | null; mobile: string; at?: Date },
 ): TemplateMessage {
   return {
-    template: 'admin_enquiry',
+    template: 'kc_enquiry_admin',
     to: settings.admin_whatsapp_numbers,
-    components: body([e.pickup, e.dropOrPackage, e.mobile, istDate(e.at), istTime(e.at)]),
+    components: body([TYPE_LABEL[e.serviceType ?? ''] ?? 'Cab', e.pickup, e.dropOrPackage, e.mobile, enquiryTime(e.at)]),
   };
 }
 
+/** kc_booking_admin: id, name, mobile, trip+car, route, address, pickup, passengers, fare, advance */
 export function adminBooking(settings: Settings, b: BookingForMessage): TemplateMessage {
   return {
-    template: 'admin_booking_enquiry',
+    template: 'kc_booking_admin',
     to: settings.admin_whatsapp_numbers,
     components: body([
-      b.id, b.customer_name, b.booking_type, b.car_type, b.pickup_location,
-      b.drop_location ?? b.rental_package, b.pickup_address, displayDate(b.pickup_date, true),
-      b.pickup_time, b.mobile, b.email, b.passengers, b.fare,
+      b.id, b.customer_name, b.mobile, tripAndCar(b), routeText(b), b.pickup_address,
+      pickupText(b), b.passengers, money(b.fare), money(b.advance_amount),
     ]),
   };
 }
 
+/** kc_booking_customer: name, id, trip+car, route, address, pickup, fare, advance + Pay button */
 export function customerBooking(b: BookingForMessage, paymentLink: string): TemplateMessage {
   return {
-    template: b.booking_type === 'local-rental' ? 'customer_local_rental_enquiry' : 'customer_booking_enquiry',
+    template: 'kc_booking_customer',
     to: [toWhatsApp(b.mobile)],
     components: {
       ...body([
-        b.customer_name, b.id, b.booking_type, b.car_type, b.pickup_location,
-        b.drop_location ?? b.rental_package, b.pickup_address, displayDate(b.pickup_date, false),
-        b.pickup_time, b.fare,
+        b.customer_name, b.id, tripAndCar(b), routeText(b), b.pickup_address,
+        pickupText(b), money(b.fare), money(b.advance_amount),
       ]),
       button_1: { subtype: 'url', type: 'text', value: payButtonValue(paymentLink) },
     },
   };
 }
 
-export function customerAdvancePaid(p: { customer_name: string; advance_amount: number; booking_id: number; mobile: string }): TemplateMessage {
+interface PaidDetails {
+  customer_name: string;
+  advance_amount: number;
+  booking_id: number;
+  mobile: string;
+  razorpay_payment_id?: string | null;
+}
+
+/** kc_payment_customer: name, advance, booking id */
+export function customerAdvancePaid(p: PaidDetails): TemplateMessage {
   return {
-    template: 'customer_advance_payment_enquiry',
+    template: 'kc_payment_customer',
     to: [toWhatsApp(p.mobile)],
-    components: body([p.customer_name, p.advance_amount, p.booking_id]),
+    components: body([p.customer_name, money(p.advance_amount), p.booking_id]),
   };
 }
 
-export function adminAdvancePaid(
-  settings: Settings,
-  p: { customer_name: string; advance_amount: number; booking_id: number; mobile: string },
+/** kc_payment_admin: id, name, mobile, advance, Razorpay payment id */
+export function adminAdvancePaid(settings: Settings, p: PaidDetails): TemplateMessage {
+  return {
+    template: 'kc_payment_admin',
+    to: settings.admin_whatsapp_numbers,
+    components: body([p.booking_id, p.customer_name, p.mobile, money(p.advance_amount), p.razorpay_payment_id]),
+  };
+}
+
+/** kc_driver_assigned: name, id, driver name, driver mobile, car model, car number, pickup */
+export function driverAssigned(
+  b: BookingForMessage,
+  d: { driverName: string; driverMobile: string; carModel: string | null; carNumber: string | null },
 ): TemplateMessage {
   return {
-    template: 'admin_advance_payment_enquiry',
-    to: settings.admin_whatsapp_numbers,
-    components: body([p.booking_id, p.customer_name, p.mobile, p.advance_amount]),
+    template: 'kc_driver_assigned',
+    to: [toWhatsApp(b.mobile)],
+    components: body([b.customer_name, b.id, d.driverName, d.driverMobile, d.carModel, d.carNumber, pickupText(b)]),
   };
 }
 

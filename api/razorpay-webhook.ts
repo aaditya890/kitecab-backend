@@ -31,7 +31,7 @@ async function handlePaid(body: RazorpayEvent, raw: unknown) {
     })
     .eq('razorpay_payment_link_id', link.id)
     .neq('status', 'PAID')
-    .select('booking_id, customer_name, mobile, advance_amount');
+    .select('booking_id, customer_name, mobile, advance_amount, razorpay_payment_id');
   if (error) throw new Error(`update payment: ${error.message}`);
   const paid = updated?.[0];
   if (!paid) return; // unknown link or already processed
@@ -46,6 +46,7 @@ async function handlePaid(body: RazorpayEvent, raw: unknown) {
     customer_name: paid.customer_name,
     mobile: String(paid.mobile),
     advance_amount: Number(paid.advance_amount),
+    razorpay_payment_id: paid.razorpay_payment_id as string | null,
   };
   waitUntil(Promise.allSettled([
     sendWhatsApp(settings, customerAdvancePaid(details)),
