@@ -1,6 +1,8 @@
 # KiteCab WhatsApp templates v2 (MSG91)
 
-Create each one in MSG91 → WhatsApp → Templates → Create New Template, on number 919009611602.
+**Status: all 6 submitted in MSG91 on 7 Nov 2026 (number 919009611602), waiting for Meta approval.**
+The texts below are exactly what was submitted (two were lengthened because Meta rejects
+templates with too many variables for their length).
 Category **Utility**, language **English**. Copy the text exactly; `{{n}}` are variables.
 The old templates keep working until the code is switched to these names after approval.
 
@@ -31,19 +33,21 @@ Example values: `One way`, `Raipur`, `Bilaspur`, `9876543210`, `24 Oct, 4:51 PM`
 
 **Body**
 ```
-New booking #{{1}}
+KiteCab: a new cab booking has been received on the website.
 
-Customer: {{2}}, {{3}}
-Trip: {{4}}, {{5}}
-Route: {{6}}
-Pickup address: {{7}}
-Date and time: {{8}}
-Passengers: {{9}}
-Fare: ₹{{10}} (advance ₹{{11}})
+Booking ID: #{{1}}
+Customer name: {{2}}
+Customer mobile: {{3}}
+Trip type and car: {{4}}
+Route: {{5}}
+Pickup address: {{6}}
+Pickup date and time: {{7}}
+Number of passengers: {{8}}
+Total fare: ₹{{9}}, advance: ₹{{10}}
 
-Please assign a driver in the admin panel.
+Please assign a driver and a car for this booking in the KiteCab admin panel.
 ```
-Example: `999971`, `Rohit Sharma`, `9876543210`, `One way`, `Sedan`, `Raipur to Bilaspur`, `Telibandha, Raipur`, `25 Oct 2026, 6:30 PM`, `2`, `2200`, `440`
+Example: `999971`, `Rohit Sharma`, `9876543210`, `One way, Sedan`, `Raipur to Bilaspur`, `Telibandha, Raipur`, `25 Oct 2026, 6:30 PM`, `2`, `2200`, `440`
 
 ---
 
@@ -51,26 +55,24 @@ Example: `999971`, `Rohit Sharma`, `9876543210`, `One way`, `Sedan`, `Raipur to 
 
 **Body**
 ```
-Hello {{1}}, your KiteCab booking request is received.
+Hello {{1}}, your KiteCab booking request has been received.
 
 Booking ID: #{{2}}
-Trip: {{3}}, {{4}}
-Route: {{5}}
-Pickup: {{6}}
-Date and time: {{7}}
-Fare: ₹{{8}}
+Trip type and car: {{3}}
+Route: {{4}}
+Pickup address: {{5}}
+Pickup date and time: {{6}}
+Total fare: ₹{{7}}
 
-Pay the advance of ₹{{9}} to confirm your cab. The rest is paid to the driver after the trip.
+Please pay the advance of ₹{{8}} using the button below to confirm your cab. The remaining amount is paid to the driver after the trip.
 ```
-**Footer:** `KiteCab · Taxi service in Chhattisgarh`
+**Footer:** `KiteCab - Taxi service in Chhattisgarh`
 
 **Buttons**
-- URL button, dynamic: text `Pay advance`, URL `https://rzp.io/{{1}}` (example `https://rzp.io/rzp/AbC123`)
-- Phone button: text `Call KiteCab`, number `+919009611602`
+- Visit website, dynamic: `Pay advance` → `https://rzp.io/{{1}}` (button_1 = link without `https://rzp.io/`)
+- Call phone number: `Call KiteCab` → +91 9009611602
 
-Example: `Rohit`, `999971`, `One way`, `Sedan`, `Raipur to Bilaspur`, `Telibandha, Raipur`, `25 Oct, 6:30 PM`, `2200`, `440`
-
-(Replaces both old customer templates: for a rental, "Route" carries the package, e.g. `Raipur · 8 hours 80 km`.)
+For a rental, "Route" carries the package, e.g. `Raipur · 8 hours 80 km`.
 
 ---
 
@@ -78,12 +80,11 @@ Example: `Rohit`, `999971`, `One way`, `Sedan`, `Raipur to Bilaspur`, `Telibandh
 
 **Body**
 ```
-Hello {{1}}, we have received your advance of ₹{{2}}.
+Hello {{1}}, we have received your advance payment of ₹{{2}} for KiteCab booking #{{3}}.
 
-Your booking #{{3}} is confirmed. Driver and car details will be sent before pickup.
+Your cab booking is now confirmed. The driver name, mobile number and car number will be sent to you on WhatsApp before your pickup time.
 ```
-**Footer:** `KiteCab · Taxi service in Chhattisgarh`
-**Button:** Phone `Call KiteCab` → `+919009611602`
+**Footer:** `KiteCab - Taxi service in Chhattisgarh` · **Button:** Call phone number `Call KiteCab` → +91 9009611602
 
 ---
 
@@ -91,13 +92,15 @@ Your booking #{{3}} is confirmed. Driver and car details will be sent before pic
 
 **Body**
 ```
-Advance received for booking #{{1}}
+KiteCab: an advance payment has been received for a cab booking.
 
-Customer: {{2}}, {{3}}
-Amount: ₹{{4}}
-Payment ID: {{5}}
+Booking ID: #{{1}}
+Customer name: {{2}}
+Customer mobile: {{3}}
+Advance amount: ₹{{4}}
+Razorpay payment ID: {{5}}
 
-The booking is now confirmed.
+The booking is now confirmed. Please make sure a driver is assigned before pickup.
 ```
 
 ---
@@ -106,16 +109,16 @@ The booking is now confirmed.
 
 **Body**
 ```
-Hello {{1}}, your driver for booking #{{2}} is assigned.
+Hello {{1}}, the driver for your KiteCab booking #{{2}} has been assigned.
 
-Driver: {{3}}
+Driver name: {{3}}
 Driver mobile: {{4}}
-Car: {{5}}, {{6}}
-Pickup: {{7}}
+Car model: {{5}}
+Car number: {{6}}
+Pickup date and time: {{7}}
 
-Have a safe trip with KiteCab.
+Please be ready at the pickup point on time. Have a safe and comfortable trip with KiteCab.
 ```
-Example: `Rohit`, `999971`, `Ramesh Sahu`, `9827012345`, `Swift Dzire`, `CG 04 AB 1234`, `25 Oct, 6:30 PM`
 
 ---
 
