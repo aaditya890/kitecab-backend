@@ -4,14 +4,17 @@ import { test } from 'node:test';
 import resend from '../api/admin/resend';
 import booking from '../api/booking';
 import enquiry from '../api/enquiry';
+import payLink from '../api/pay-link';
+import { payToken, validPayToken } from '../lib/pay-token';
 import webhook from '../api/razorpay-webhook';
 
 process.env.RAZORPAY_WEBHOOK_SECRET = 'whsec_test';
 process.env.ALLOWED_ORIGINS = 'https://kitecab.com';
+process.env.IP_HASH_SALT ??= 'test-salt';
 
 function call(handler: any, opts: { method: string; headers?: Record<string, string>; body?: unknown; raw?: string }) {
   const req: any = Readable.from([Buffer.from(opts.raw ?? '')]);
-  Object.assign(req, { method: opts.method, headers: opts.headers ?? {}, body: opts.body, socket: {} });
+  Object.assign(req, { method: opts.method, headers: opts.headers ?? {}, body: opts.body, socket: {}, query: (opts as { query?: unknown }).query ?? {} });
   return new Promise<{ status: number; headers: Record<string, string>; json: any }>((resolve) => {
     const out = { status: 200, headers: {} as Record<string, string>, json: undefined as any };
     const res: any = {
@@ -51,4 +54,21 @@ test('webhook rejects forged payment', async () => {
 test('admin endpoint needs login', async () => {
   const r = await call(resend, { method: 'POST', body: { bookingId: 1, action: 'admin-whatsapp' } });
   assert.equal(r.status, 401);
+});
+
+test('pay token: only the right booking id is accepted', () => {
+  const t = payToken(999971);
+  assert.equal(t.length, 24);
+  assert.ok(validPayToken(999971, t));
+  assert.ok(!validPayToken(999972, t));
+  assert.ok(!validPayToken(999971, t.slice(0, 23) + (t.endsWith('A') ? 'B' : 'A')));
+  assert.ok(!validPayToken(999971, ''));
+});
+
+test('pay-link refuses a wrong token before touching the database', async () => {
+  const req = (q: Record<string, string>) => ({ method: 'GET', query: q });
+  const r1 = await call(payLink, { ...req({ id: '999971', t: 'nope' }) } as never);
+  assert.equal(r1.status, 404);
+  const r2 = await call(payLink, { ...req({ id: 'abc', t: payToken(1) }) } as never);
+  assert.equal(r2.status, 404);
 });

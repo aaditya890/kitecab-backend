@@ -38,6 +38,7 @@ Development uses a separate project.
 | 008 | Staff role, lead follow-ups, office booking fields, automatic activity log |
 | 009 | "Call now" counts new leads; admin display name |
 | 010 | Staff performance counts bookings made from leads |
+| 011 | `create_booking()`: customer + booking saved in one call (faster booking) |
 
 Business rules live in the `settings` table (Admin → Settings): `advance_percent`,
 `admin_whatsapp_numbers`, `support_phone`, `support_email`, `business`, `booking_open`,
@@ -49,7 +50,8 @@ Business rules live in the `settings` table (Admin → Settings): `advance_perce
 |---|---|---|
 | `GET /api/catalog` | Website booking form | Places, one-way fares, rentals, round-trip rates from the DB; CDN-cached 60 s |
 | `POST /api/enquiry` | "Check price" | Saves the lead (with the lowest fare shown), WhatsApp `kc_enquiry_admin` |
-| `POST /api/booking` | Booking form | Fare **from the DB**, saves customer + booking, Razorpay advance link, `kc_booking_admin` + `kc_booking_customer` |
+| `POST /api/booking` | Booking form | Fare **from the DB**, saves customer + booking in one call and replies; then creates the Razorpay advance link and sends `kc_booking_admin` + `kc_booking_customer` |
+| `GET /api/pay-link?id=&t=` | Booking form, right after booking | Returns the advance link once ready (signed token from the booking reply) |
 | `POST /api/razorpay-webhook` | Razorpay | Verifies signature, marks PAID once, confirms booking, `kc_payment_customer` + `kc_payment_admin` |
 | `POST /api/admin/resend` | Admin panel (login token, admin role) | `customer-whatsapp`, `admin-whatsapp`, `new-payment-link`, `driver-whatsapp` (`kc_driver_assigned`) |
 

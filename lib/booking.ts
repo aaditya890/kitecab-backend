@@ -58,12 +58,16 @@ export interface CreatedBooking {
   bookingId: number;
   fare: number;
   advanceAmount: number;
-  paymentLink: string | null;
-  /** Background WhatsApp sends — pass to waitUntil() so the response isn't delayed. */
-  notifications: Promise<unknown>;
+  /**
+   * Already running: creates the Razorpay advance link, saves it and sends the WhatsApps.
+   * The API replies before this finishes (pass it to waitUntil); the website then shows the
+   * pay button as soon as the link exists (GET /api/pay-link).
+   */
+  afterReply: Promise<unknown>;
 }
 
-export async function createBooking(input: BookingInput, settings: Settings, ipHash: string): Promise<CreatedBooking> {
+/** Saves the booking in one database call. `q` can be passed in when already calculated. */
+export async function createBooking(input: BookingInput, settings: Settings, ipHash: string, q?: Quote): Promise<CreatedBooking> {
   if (!settings.booking_open) throw new HttpError(503, 'Online booking is paused. Please call or WhatsApp us.');
 
   const c = input.customer;
@@ -71,32 +75,25 @@ export async function createBooking(input: BookingInput, settings: Settings, ipH
   const maxDate = istToday(new Date(Date.now() + 366 * 86_400_000));
   if (c.pickupDate < today || c.pickupDate > maxDate) throw new HttpError(400, 'Please choose a valid pickup date.');
 
-  const q = await quote(input);
-  const advanceAmount = advanceFor(q.fare, settings.advance_percent);
+  const fare = q ?? (await quote(input));
+  const advanceAmount = advanceFor(fare.fare, settings.advance_percent);
 
-  const customer = must(
-    await db().from('customers')
-      .upsert({ full_name: c.fullName, mobile: c.mobile, email: c.email }, { onConflict: 'mobile' })
-      .select('id').single(),
-    'save customer',
-  );
-
-  const booking = must(
-    await db().from('bookings').insert({
+  const saved = await db().rpc('create_booking', {
+    p_customer: { full_name: c.fullName, mobile: c.mobile, email: c.email },
+    p_booking: {
       booking_type: input.bookingType,
       car_type: input.carType,
       pickup_location: input.pickup,
       drop_location: input.bookingType === 'local-rental' ? null : input.drop,
-      route_id: q.routeId,
-      rental_package_id: q.rentalPackageId,
-      rental_package: q.rentalPackage,
+      route_id: fare.routeId,
+      rental_package_id: fare.rentalPackageId,
+      rental_package: fare.rentalPackage,
       waiting_time: input.waitingTime ?? null,
       approx_distance_km: input.approxDistanceKm ?? null,
-      distance_km: q.distanceKm,
-      fare: q.fare,
+      distance_km: fare.distanceKm,
+      fare: fare.fare,
       advance_percent: settings.advance_percent,
       advance_amount: advanceAmount,
-      customer_id: customer.id,
       customer_name: c.fullName,
       mobile: c.mobile,
       email: c.email,
@@ -105,23 +102,35 @@ export async function createBooking(input: BookingInput, settings: Settings, ipH
       pickup_date: c.pickupDate,
       pickup_time: c.pickupTime,
       ip_hash: ipHash,
-    }).select('*').single(),
-    'save booking',
-  ) as BookingForMessage;
+    },
+  });
+  const booking = must(saved, 'save booking') as BookingForMessage;
 
-  // Payment link: if Razorpay is down the booking is still saved and admins are told.
+  return {
+    bookingId: booking.id,
+    fare: fare.fare,
+    advanceAmount,
+    afterReply: preparePayment(booking, advanceAmount, settings),
+  };
+}
+
+/** Razorpay link + payment row + booking WhatsApps. Never throws: the booking is already saved. */
+async function preparePayment(booking: BookingForMessage, advanceAmount: number, settings: Settings): Promise<void> {
   let paymentLink: string | null = null;
   if (advanceAmount > 0) {
     try {
       const link = await createPaymentLink({
-        bookingId: booking.id, amount: advanceAmount, customerName: c.fullName, mobile: c.mobile, email: c.email,
+        bookingId: booking.id,
+        amount: advanceAmount,
+        customerName: booking.customer_name,
+        mobile: booking.mobile,
+        email: booking.email,
       });
-      paymentLink = link.short_url;
-      const saved = await db().from('booking_payments').insert({
+      const row = await db().from('booking_payments').insert({
         booking_id: booking.id,
-        customer_name: c.fullName,
-        mobile: c.mobile,
-        booking_amount: q.fare,
+        customer_name: booking.customer_name,
+        mobile: booking.mobile,
+        booking_amount: booking.fare,
         advance_amount: advanceAmount,
         payment_type: 'ADVANCE',
         status: 'PENDING',
@@ -129,16 +138,14 @@ export async function createBooking(input: BookingInput, settings: Settings, ipH
         razorpay_payment_link_id: link.id,
         reference_id: `BOOKING_${booking.id}`,
       });
-      if (saved.error) console.error('save payment', saved.error.message);
+      if (row.error) console.error('save payment', row.error.message);
+      else paymentLink = link.short_url;
     } catch (err) {
-      console.error(err);
+      console.error('payment link', err);
     }
   }
-
-  const notifications = Promise.allSettled([
+  await Promise.allSettled([
     sendWhatsApp(settings, adminBooking(settings, booking)),
     paymentLink ? sendWhatsApp(settings, customerBooking(booking, paymentLink)) : Promise.resolve(false),
   ]);
-
-  return { bookingId: booking.id, fare: q.fare, advanceAmount, paymentLink, notifications };
 }

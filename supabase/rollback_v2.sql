@@ -7,7 +7,7 @@ begin;
 
 drop view if exists public.admin_enquiries, public.admin_activity, public.admin_staff, public.route_fares, public.my_bookings, public.admin_bookings, public.admin_customers, public.admin_routes;
 drop trigger if exists kitecab_on_auth_user_created on auth.users;
-drop function if exists public.admin_set_staff(text, text, text), public.staff_performance(int), public.lead_counts(),
+drop function if exists public.create_booking(jsonb, jsonb), public.admin_set_staff(text, text, text), public.staff_performance(int), public.lead_counts(),
   public.admin_stats(int), public.admin_dashboard(), public.handle_new_auth_user();
 
 drop table if exists public.enquiry_followups, public.activity_log cascade;
