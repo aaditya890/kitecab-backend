@@ -3,6 +3,7 @@
 //   { bookingId, action: 'admin-whatsapp' }     re-send the admin booking alert
 //   { bookingId, action: 'new-payment-link' }   cancel old unpaid link, create a new one, WhatsApp it
 //   { bookingId, action: 'driver-whatsapp' }    send driver + car details to the customer
+//   { bookingId, action: 'cancel-payment-links' } cancel unpaid links (booking cancelled)
 import { z } from 'zod';
 import { requireAdmin } from '../../lib/admin-auth';
 import { db, getSettings, must } from '../../lib/db';
@@ -13,7 +14,7 @@ import { adminBooking, customerBooking, driverAssigned, sendWhatsApp, type Booki
 
 const input = z.object({
   bookingId: z.number().int().positive(),
-  action: z.enum(['customer-whatsapp', 'admin-whatsapp', 'new-payment-link', 'driver-whatsapp']),
+  action: z.enum(['customer-whatsapp', 'admin-whatsapp', 'new-payment-link', 'driver-whatsapp', 'cancel-payment-links']),
 });
 
 export default route({ methods: ['POST'], cors: true }, async (req, res) => {
@@ -31,6 +32,16 @@ export default route({ methods: ['POST'], cors: true }, async (req, res) => {
   );
   if (payments.some((p) => p.status === 'PAID') && action === 'new-payment-link') {
     throw new HttpError(409, 'Advance is already paid for this booking.');
+  }
+
+  if (action === 'cancel-payment-links') {
+    let cancelled = 0;
+    for (const p of payments.filter((p) => p.status === 'PENDING')) {
+      await cancelPaymentLink(p.razorpay_payment_link_id);
+      await db().from('booking_payments').update({ status: 'CANCELLED' }).eq('id', p.id);
+      cancelled++;
+    }
+    return res.json({ ok: true, cancelled });
   }
 
   if (action === 'driver-whatsapp') {
