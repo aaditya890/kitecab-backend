@@ -1,0 +1,12 @@
+# Not uploaded to Vercel
+.env
+.env.*
+!.env.example
+pnpm-lock.yaml
+pnpm-workspace.yaml
+node_modules
+scripts
+supabase
+docs
+test
+*.txt
