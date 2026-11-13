@@ -161,7 +161,7 @@ Browser ──► kitecab-frontend (static prerendered HTML on S3/CloudFront lat
 - Compact table, chips tabs, filter bar.
 - No-name leads show the mobile number as the title.
 - The "By" column shows initials plus first name.
-- Verify it at 1280px with no horizontal scroll, then commit.
+- Committed (4fef4b7) but not yet checked in the browser. Open `/admin/enquiries` at 1280px and confirm there is no horizontal scroll.
 
 **User must do:**
 - **Razorpay webhook:**
